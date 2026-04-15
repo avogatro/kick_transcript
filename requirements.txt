@@ -1,0 +1,8 @@
+yt-dlp
+curl-cffi
+ffmpeg
+openai-whisper
+torch
+torchvision
+torchaudio
+google-genai
