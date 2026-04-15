@@ -33,13 +33,13 @@ sudo apt update && sudo apt install ffmpeg
 ```
 
 ### 3. Ollama (Local AI Summarizer)
-This script uses a local Large Language Model via Ollama to crunch the transcript into a detailed summary. Based on the script's default, it looks for the `kimi-k2.5:cloud` model.
+This script uses a local Large Language Model via Ollama to crunch the transcript into a detailed summary. Based on the script's default, it looks for the `minimax-m2.7:cloud` model.
 
 1. Download and install [Ollama](https://ollama.com/download) for your operating system.
 2. Ensure the Ollama app is running in the background.
 3. Open a terminal and test the required model before running the script:
    ```bash
-   ollama run kimi-k2.5:cloud
+   ollama run minimax-m2.7:cloud
    ```
    *(If you want to use local model, such as `llama3`, run `ollama pull llama3` instead and specify it via the script arguments).*
 
@@ -64,7 +64,7 @@ python kick_tool.py "https://kick.com/sneako/videos/video-id-here" `
     --start "01:02:23" `
     --end "02:20:00" `
     --vocabulary "Host is Sneako, speaking with guest Professor Jiang" `
-    --model "kimi-k2.5:cloud"
+    --model "minimax-m2.7:cloud"
 ```
 
 ### Available Arguments
@@ -73,7 +73,7 @@ python kick_tool.py "https://kick.com/sneako/videos/video-id-here" `
 - `--end`: End time for trimming (e.g., `00:02:45`). **Note:** Both `--start` and `--end` must be provided to clip the video correctly.
 - `--output`: Name of the temporary audio file (default: `audio.mp3`).
 - `--vocabulary`: Specific names or context to help Whisper transcribe better (This is also fed to Ollama to establish prompt context).
-- `--model`: The local Ollama model to use for the API call (default: `kimi-k2.5:cloud`).
+- `--model`: The local Ollama model to use for the API call (default: `minimax-m2.7:cloud`).
 - `--no-transcript`: Skip the Whisper transcription phase completely.
 
 ### Output Files

@@ -112,7 +112,7 @@ def main():
     parser.add_argument("--output", help="Output filename for the audio (default: audio.mp3)", default="audio.mp3")
     parser.add_argument("--no-transcript", help="Skip the Whisper transcription.", action="store_true")
     parser.add_argument("--vocabulary", help="Names of guests, hosts, or context to help Whisper spell them correctly (e.g., 'Destiny, Sneako').", default="")
-    parser.add_argument("--model", help="Ollama model to use for summarization. If provided, the script will automatically query local Ollama.", default="kimi-k2.5:cloud")
+    parser.add_argument("--model", help="Ollama model to use for summarization. If provided, the script will automatically query local Ollama.", default="minimax-m2.7:cloud")
     
     # Customize the GEM / Skill prompt here
     parser.add_argument(
@@ -143,7 +143,7 @@ At the end of each summary, write a short introduction and list some highlights.
         transcript = transcribe_and_prepare_prompt(video_path, args.prompt, offset_seconds=offset, vocabulary=args.vocabulary)
         #with open("transcript.txt", "r", encoding="utf-8") as f:
         #    transcript = f.read()
-        
+
         # 3. Automatic Ollama API Call
         model_name = args.model
         if model_name:
