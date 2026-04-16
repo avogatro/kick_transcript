@@ -106,13 +106,14 @@ def transcribe_and_prepare_prompt(video_path, prompt_text, whisper_model_size="b
 
 def main():
     parser = argparse.ArgumentParser(description="Download a Kick video, optionally cut it, and generate a transcript summary prompt for Gemini.")
-    parser.add_argument("url", help="The URL of the Kick video or clip.")
+    parser.add_argument("url", nargs="?", help="The URL of the Kick video or clip. Optional if skipping steps.", default="")
     parser.add_argument("--start", help="Start time in seconds or HH:MM:SS format (e.g., 00:01:30).", default=None)
     parser.add_argument("--end", help="End time in seconds or HH:MM:SS format (e.g., 00:02:45).", default=None)
     parser.add_argument("--output", help="Output filename for the audio (default: audio.mp3)", default="audio.mp3")
     parser.add_argument("--no-transcript", help="Skip the Whisper transcription.", action="store_true")
     parser.add_argument("--vocabulary", help="Names of guests, hosts, or context to help Whisper spell them correctly (e.g., 'Destiny, Sneako').", default="")
     parser.add_argument("--model", help="Ollama model to use for summarization. If provided, the script will automatically query local Ollama.", default="minimax-m2.7:cloud")
+    parser.add_argument("--skip-step-to", choices=["step-transcription", "step-summary"], help="Skip directly to transcription or summarization step.", default=None)
     
     # Customize the GEM / Skill prompt here
     parser.add_argument(
@@ -132,19 +133,35 @@ At the end of each summary, write a short introduction and list some highlights.
     
     args = parser.parse_args()
     
+    video_path = args.output
     # 1. Download / Clip Video
-    video_path = download_video(args.url, args.start, args.end, args.output)
+    if args.skip_step_to not in ["step-transcription", "step-summary"]:
+        if not args.url:
+            parser.error("url argument is required unless --skip-step-to is provided.")
+        video_path = download_video(args.url, args.start, args.end, args.output)
+    else:
+        print(f"Skipping video download based on --skip-step-to. Assuming video exists at '{video_path}' if needed.")
     
-    # 2. Transcribe and Generate Gemini Prompt
-    if not args.no_transcript:
-        offset = 0
-        # offset = parse_time_to_seconds(args.start)
-        transcript = ""
-        transcript = transcribe_and_prepare_prompt(video_path, args.prompt, offset_seconds=offset, vocabulary=args.vocabulary)
-        #with open("transcript.txt", "r", encoding="utf-8") as f:
-        #    transcript = f.read()
+    # 2. Transcribe and Generate Prompt
+    transcript = ""
+    if args.skip_step_to != "step-summary":
+        if not args.no_transcript:
+            offset = 0
+            # offset = parse_time_to_seconds(args.start)
+            transcript = transcribe_and_prepare_prompt(video_path, args.prompt, offset_seconds=offset, vocabulary=args.vocabulary)
+        else:
+            print("\nSkipping transcription as --no-transcript was provided.")
+    else:
+        print("\nSkipping transcription step. Loading existing transcript from 'transcript.txt'...")
+        try:
+            with open("transcript.txt", "r", encoding="utf-8") as f:
+                transcript = f.read()
+        except FileNotFoundError:
+            print("Error: 'transcript.txt' not found. Cannot skip to summary.", file=sys.stderr)
+            sys.exit(1)
 
-        # 3. Automatic Ollama API Call
+    # 3. Automatic Ollama API Call
+    if transcript:
         model_name = args.model
         if model_name:
             print("\n" + "=" * 60)
@@ -164,7 +181,7 @@ At the end of each summary, write a short introduction and list some highlights.
                 print(result.get("response", ""))
                 print("======================\n")
 
-                with open("summary.txt", "w", encoding="utf-8") as f:
+                with open("summary.md", "w", encoding="utf-8") as f:
                     f.write(result.get("response"))
             except ImportError:
                 print("Error: 'requests' is not installed. Run 'pip install requests'.", file=sys.stderr)
@@ -176,9 +193,6 @@ At the end of each summary, write a short introduction and list some highlights.
             full_text = f"{args.prompt}\n\nf{args.vocabulary}\n\n[Transcript from Video]:\n{transcript}"
             print(full_text)
             print("=" * 60)
-            
-    else:
-        print("\nSkipping transcription as --no-transcript was provided.")
 
 if __name__ == "__main__":
     main()
