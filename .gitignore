@@ -2,3 +2,6 @@ audio.mp3
 summary.txt
 summary.md
 transcript.txt
+.dl_info.txt
+*.mp4
+*.png
