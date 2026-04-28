@@ -47,12 +47,12 @@ This script uses a local Large Language Model via Ollama to crunch the transcrip
 
 ## How to Use the Script
 
-Run the tool via the command line using `python kick_tool.py <URL>`. 
+Run the tool via the command line using `python summarize_video.py <URL>`. 
 
 ### Basic Usage
 To download a video, transcribe it from start to finish, and summarize it:
 ```bash
-python kick_tool.py "https://kick.com/sneako/videos/video-id-here"
+python summarize_video.py "https://kick.com/sneako/videos/video-id-here"
 ```
 
 ### Advanced Usage (Clipping & Vocabulary)
@@ -60,24 +60,29 @@ You can trim the video to specific timestamps to save time. You can also provide
 
 **Windows PowerShell Example:**
 ```powershell
-python kick_tool.py "https://kick.com/sneako/videos/video-id-here" `
+python summarize_video.py "https://kick.com/sneako/videos/video-id-here" `
     --start "01:02:23" `
     --end "02:20:00" `
     --vocabulary "Host is Sneako, speaking with guest Professor Jiang" `
     --model "minimax-m2.7:cloud"
 ```
 
+```powershell
+python summarize_video.py "https://www.youtube.com/watch?v=txgPfnXgzcE" `
+    --vocabulary "use 'Jiang' instead of 'the speaker'" `
+```
+python summarize_video.py "https://www.youtube.com/watch?v=txgPfnXgzcE" --vocabulary "use 'Jiang' instead of 'the speaker' "
 ### Skipping Steps (Resuming or Re-running)
 If your download failed, or you want to re-run the summary without waiting for the transcription, you can skip directly to those steps. You don't need to provide the `url` when skipping.
 
 **Skip download (starts from transcription using existing `audio.mp3`):**
 ```bash
-python kick_tool.py --skip-step-to step-transcription -vocabulary "Host is Sneako, speaking with guest Professor Jiang"
+python summarize_video.py --skip-step-to step-transcription -vocabulary "Host is Sneako, speaking with guest Professor Jiang"
 ```
 
 **Skip transcription (starts from summary using existing `transcript.txt`) force different LLM prompt:**
 ```bash
-python kick_tool.py --skip-step-to step-summary -vocabulary "Spell Name Jiang instead of Zhang." --prompt "summarize the following transcript"
+python summarize_video.py --skip-step-to step-summary -vocabulary "Spell Name Jiang instead of Zhang." --prompt "summarize the following transcript"
 ```
 
 ### Available Arguments

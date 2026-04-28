@@ -67,7 +67,7 @@ def download_video(url, quality="480p", start=None, end=None, output=None, audio
     elif start or end:
         print("Warning: Both --start and --end must be provided to clip the video. Downloading the full video instead.")
 
-    # 4. Attempt to bypass Cloudflare and similar blocks like in kick_tool
+    # 4. Attempt to bypass Cloudflare and similar blocks like in summarize_video
     command.extend(["--impersonate", "chrome"])
 
     command.append(url)

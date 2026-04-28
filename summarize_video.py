@@ -128,7 +128,10 @@ The language should be clear, logical, and easy to read.
 Add timestamps for me to navigate and rewatch interesting parts of the video.
 Add titles for sections or chapters if it makes sense.
 The output should be in Markdown format so that I can easily copy and paste it into Discord.
-At the end of each summary, write a short introduction and list some highlights."""
+At the end of each summary, write a short introduction and list some highlights. 
+Do not use markdown table format.
+Time is represented as [hh:mm:ss] at the beginning of each line.
+"""
     )
     
     args = parser.parse_args()
