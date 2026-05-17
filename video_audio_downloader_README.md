@@ -66,18 +66,23 @@ Want to name the file yourself rather than using the video title? Specify an out
 python video_audio_downloader.py "https://www.youtube.com/watch?v=YOUR_URL" --output "my_funny_clip.mp4"
 ```
 
-### 6. Subtitles (`--subs`, `--embed-subs`, `--edit-subs`)
+### 6. Subtitles (`--subs`, `--embed-subs`, `--burn-subs`, `--edit-subs`, `--burn-color`)
 You can download subtitles natively with `yt-dlp` and embed them accurately, even when combining clipping and speed adjustments!
 - `--subs`: Only downloads the external `.srt` file.
-- `--embed-subs`: Downloads and burns/embeds the `.srt` subtitles directly into the resulting `.mp4` file.
-- `--edit-subs`: Pauses the downloader right before embedding so you can manually correct the downloaded `.srt` file!
+- `--embed-subs`: Soft-embeds the `.srt` subtitles into the resulting `.mp4` file as a toggleable track.
+- `--burn-subs`: Hard-burns the subtitles directly into the video pixels permanently (requires re-encoding the video).
+- `--burn-color`: Sets the text color when using `--burn-subs` (e.g. `yellow`, `white`, `green`). Default is `white`.
+- `--edit-subs`: Pauses the downloader right before embedding/burning so you can manually correct the downloaded `.srt` file!
 
 ```powershell
-# Automatically download and embed subtitles for a video
+# Automatically download and embed soft subtitles for a video
 python video_audio_downloader.py "https://www.youtube.com/watch?v=YOUR_URL" --embed-subs
 
-# Interactive mode to manually correct subtitles before they are embedded
-python video_audio_downloader.py "https://www.youtube.com/watch?v=YOUR_URL" --edit-subs
+# Automatically download and permanently hard-burn YELLOW subtitles into the video
+python video_audio_downloader.py "https://www.youtube.com/watch?v=YOUR_URL" --burn-subs --burn-color yellow
+
+# Interactive mode to manually correct subtitles before they are embedded/burned
+python video_audio_downloader.py "https://www.youtube.com/watch?v=YOUR_URL" --edit-subs --burn-subs
 ```
 
 ### Putting It All Together

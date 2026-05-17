@@ -82,7 +82,7 @@ def process_srt_file(input_file, output_file, start_offset=0.0, speed=1.0, end_t
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write("\n\n".join(new_blocks) + "\n")
 
-def download_video(url, quality="480p", start=None, end=None, output=None, audio_only=False, speed=1.0, subs=False, embed_subs=False, edit_subs=False, sub_lang="en"):
+def download_video(url, quality="480p", start=None, end=None, output=None, audio_only=False, speed=1.0, subs=False, embed_subs=False, edit_subs=False, burn_subs=False, sub_lang="en", burn_color="white"):
     """
     Downloads a video from a given URL using yt-dlp.
     Supports clipping, quality selection, and audio-only extraction.
@@ -152,7 +152,7 @@ def download_video(url, quality="480p", start=None, end=None, output=None, audio
     # 4. Attempt to bypass Cloudflare and similar blocks like in summarize_video
     command.extend(["--impersonate", "chrome"])
 
-    if subs or embed_subs or edit_subs:
+    if subs or embed_subs or edit_subs or burn_subs:
         command.extend([
             "--write-subs",
             "--write-auto-subs",
@@ -225,12 +225,23 @@ def download_video(url, quality="480p", start=None, end=None, output=None, audio
                 print("Could not find downloaded file info to adjust speed.", file=sys.stderr)
 
         # Subtitle processing
-        if subs or embed_subs or edit_subs:
+        if subs or embed_subs or edit_subs or burn_subs:
             final_video_file = downloaded_file if ('downloaded_file' in locals() and downloaded_file and os.path.exists(downloaded_file)) else actual_output
             base, _ = os.path.splitext(actual_output)
-            original_srt = f"{base}.{sub_lang}.srt"
             
-            if os.path.exists(original_srt):
+            # yt-dlp sometimes appends .en.srt to the full filename including the extension, and sometimes to the base name.
+            possible_srt_paths = [
+                f"{actual_output}.{sub_lang}.srt", # e.g., video.mp4.en.srt
+                f"{base}.{sub_lang}.srt"           # e.g., video.en.srt
+            ]
+            
+            original_srt = None
+            for p in possible_srt_paths:
+                if os.path.exists(p):
+                    original_srt = p
+                    break
+            
+            if original_srt:
                 processed_srt = f"{base}.processed.srt"
                 start_offset = parse_time_to_seconds(start)
                 end_seconds = parse_time_to_seconds(end) if end else None
@@ -245,24 +256,52 @@ def download_video(url, quality="480p", start=None, end=None, output=None, audio
                     input(f"Press Enter here when you are ready to continue embedding... ")
                     print(f"=======================================================\n")
                 
-                if embed_subs or edit_subs:
+                if embed_subs or edit_subs or burn_subs:
                     if not audio_only:
-                        print(f"Embedding subtitles into video...")
+                        print(f"{'Burning' if burn_subs else 'Embedding'} subtitles into video...")
                         temp_vid = f"{base}_subbed.mp4"
-                        ffmpeg_sub_cmd = [
-                            "ffmpeg", "-y", "-i", final_video_file, "-i", processed_srt,
-                            "-c", "copy", "-c:s", "mov_text", temp_vid
-                        ]
+                        
+                        if burn_subs:
+                            srt_escaped = processed_srt.replace('\\', '/').replace("'", r"\'").replace(":", r"\:")
+                            
+                            # FFmpeg's libass uses BGR color codes: &HBBGGRR&
+                            ass_colors = {
+                                "white": "&HFFFFFF&",
+                                "yellow": "&H00FFFF&",
+                                "green": "&H00FF00&",
+                                "cyan": "&HFFFF00&",
+                                "blue": "&HFF0000&",
+                                "magenta": "&HFF00FF&",
+                                "red": "&H0000FF&",
+                                "black": "&H000000&"
+                            }
+                            color_code = ass_colors.get(burn_color.lower(), "&HFFFFFF&")
+                            
+                            # Add a nice black outline to make the color pop
+                            style = f"PrimaryColour={color_code},OutlineColour=&H000000&,BorderStyle=1,Outline=2,Shadow=0"
+                            
+                            ffmpeg_sub_cmd = [
+                                "ffmpeg", "-y", "-i", final_video_file,
+                                "-map", "0:v?", "-map", "0:a?",
+                                "-vf", f"subtitles='{srt_escaped}':force_style='{style}'",
+                                "-c:a", "copy", temp_vid
+                            ]
+                        else:
+                            ffmpeg_sub_cmd = [
+                                "ffmpeg", "-y", "-i", final_video_file, "-i", processed_srt,
+                                "-map", "0:v?", "-map", "0:a?", "-map", "1:s",
+                                "-c:v", "copy", "-c:a", "copy", "-c:s", "mov_text", temp_vid
+                            ]
                         try:
                             subprocess.run(ffmpeg_sub_cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
                             os.replace(temp_vid, final_video_file)
-                            print(f"Subtitles embedded successfully.")
+                            print(f"Subtitles {'burned' if burn_subs else 'embedded'} successfully.")
                         except subprocess.CalledProcessError:
                             print(f"Error embedding subtitles using ffmpeg.", file=sys.stderr)
                     else:
                         print(f"Skipping subtitle embedding because --audio-only was requested.")
             else:
-                print(f"\nWarning: Subtitle file '{original_srt}' was not found. No subtitles to process.", file=sys.stderr)
+                print(f"\nWarning: Subtitle file was not found (checked {possible_srt_paths}). No subtitles to process.", file=sys.stderr)
 
     except subprocess.CalledProcessError as e:
         print(f"\nError downloading video: {e}", file=sys.stderr)
@@ -281,9 +320,11 @@ def main():
     parser.add_argument("--audio-only", help="Download audio only and bypass video download.", action="store_true")
     parser.add_argument("--speed", help="Speed to play the video/audio at (e.g., 1.5, 2.0). Default is 1.0 (normal).", type=float, default=1.0)
     parser.add_argument("--subs", help="Download subtitles (default lang: en).", action="store_true")
-    parser.add_argument("--embed-subs", help="Automatically embed the subtitles into the final video file.", action="store_true")
-    parser.add_argument("--edit-subs", help="Pause the script to let you manually edit the downloaded .srt file before embedding.", action="store_true")
+    parser.add_argument("--embed-subs", help="Automatically embed the subtitles into the final video file as soft subtitles.", action="store_true")
+    parser.add_argument("--burn-subs", help="Hard burn the subtitles directly into the video pixels (re-encodes video).", action="store_true")
+    parser.add_argument("--edit-subs", help="Pause the script to let you manually edit the downloaded .srt file before embedding/burning.", action="store_true")
     parser.add_argument("--sub-lang", help="Subtitle language to download. Default: en", default="en")
+    parser.add_argument("--burn-color", help="Color of the text when using --burn-subs (e.g. 'yellow', 'white', 'green', 'red'). Default: white", default="white")
     
     args = parser.parse_args()
     
@@ -298,7 +339,9 @@ def main():
         subs=args.subs,
         embed_subs=args.embed_subs,
         edit_subs=args.edit_subs,
-        sub_lang=args.sub_lang
+        burn_subs=args.burn_subs,
+        sub_lang=args.sub_lang,
+        burn_color=args.burn_color
     )
 
 if __name__ == "__main__":
