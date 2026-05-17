@@ -9,6 +9,7 @@ A lightweight, powerful Python tool designed to download, trim, and process YouT
 - **Section Clipping:** Selectively download only the specific chapters/timestamps you want—saving massive amounts of bandwidth and memory.
 - **Speed Adjustment:** Increase or decrease video and audio speed perfectly in sync using built-in `ffmpeg` filtering.
 - **Intelligent Collision Avoidance:** If a file with the same title already exists, the tool handles appending sequential numbers to the end seamlessly (e.g., `Video 2.mp4`) instead of crashing or overwriting your work.
+- **Smart Subtitles:** Download, intelligently offset/scale subtitles to match your clipping and speed adjustments, and even optionally edit them manually before embedding them into your final video.
 
 ---
 
@@ -63,6 +64,20 @@ python video_audio_downloader.py "https://www.youtube.com/watch?v=YOUR_URL" --au
 Want to name the file yourself rather than using the video title? Specify an output! Don't worry, if you pick a name that already exists in the folder, the script will append a number to prevent overwriting your existing file.
 ```powershell
 python video_audio_downloader.py "https://www.youtube.com/watch?v=YOUR_URL" --output "my_funny_clip.mp4"
+```
+
+### 6. Subtitles (`--subs`, `--embed-subs`, `--edit-subs`)
+You can download subtitles natively with `yt-dlp` and embed them accurately, even when combining clipping and speed adjustments!
+- `--subs`: Only downloads the external `.srt` file.
+- `--embed-subs`: Downloads and burns/embeds the `.srt` subtitles directly into the resulting `.mp4` file.
+- `--edit-subs`: Pauses the downloader right before embedding so you can manually correct the downloaded `.srt` file!
+
+```powershell
+# Automatically download and embed subtitles for a video
+python video_audio_downloader.py "https://www.youtube.com/watch?v=YOUR_URL" --embed-subs
+
+# Interactive mode to manually correct subtitles before they are embedded
+python video_audio_downloader.py "https://www.youtube.com/watch?v=YOUR_URL" --edit-subs
 ```
 
 ### Putting It All Together
