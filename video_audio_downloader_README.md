@@ -10,6 +10,7 @@ A lightweight, powerful Python tool designed to download, trim, and process YouT
 - **Speed Adjustment:** Increase or decrease video and audio speed perfectly in sync using built-in `ffmpeg` filtering.
 - **Intelligent Collision Avoidance:** If a file with the same title already exists, the tool handles appending sequential numbers to the end seamlessly (e.g., `Video 2.mp4`) instead of crashing or overwriting your work.
 - **Smart Subtitles:** Download, intelligently offset/scale subtitles to match your clipping and speed adjustments, and even optionally edit them manually before embedding them into your final video.
+- **AI Whisper Translation:** Optionally use local Whisper AI and Ollama to transcribe, translate, and hard-burn English (or other language) subtitles directly over existing hardcoded video text!
 
 ---
 
@@ -66,23 +67,33 @@ Want to name the file yourself rather than using the video title? Specify an out
 python video_audio_downloader.py "https://www.youtube.com/watch?v=YOUR_URL" --output "my_funny_clip.mp4"
 ```
 
-### 6. Subtitles (`--subs`, `--embed-subs`, `--burn-subs`, `--edit-subs`, `--burn-color`)
+### 6. Subtitles (`--subs`, `--embed-subs`, `--burn-subs`, `--edit-subs`, `--burn-color`, `--burn-bg`)
 You can download subtitles natively with `yt-dlp` and embed them accurately, even when combining clipping and speed adjustments!
 - `--subs`: Only downloads the external `.srt` file.
 - `--embed-subs`: Soft-embeds the `.srt` subtitles into the resulting `.mp4` file as a toggleable track.
 - `--burn-subs`: Hard-burns the subtitles directly into the video pixels permanently (requires re-encoding the video).
 - `--burn-color`: Sets the text color when using `--burn-subs` (e.g. `yellow`, `white`, `green`). Default is `white`.
+- `--burn-bg`: Draws a solid black background box behind the burned subtitles. Perfect for hiding existing hardcoded text!
 - `--edit-subs`: Pauses the downloader right before embedding/burning so you can manually correct the downloaded `.srt` file!
 
 ```powershell
-# Automatically download and embed soft subtitles for a video
-python video_audio_downloader.py "https://www.youtube.com/watch?v=YOUR_URL" --embed-subs
-
 # Automatically download and permanently hard-burn YELLOW subtitles into the video
-python video_audio_downloader.py "https://www.youtube.com/watch?v=YOUR_URL" --burn-subs --burn-color yellow
+python video_audio_downloader.py "https://www.youtube.com/watch?v=YOUR_URL" --burn-subs --burn-color yellow --burn-bg
+```
 
-# Interactive mode to manually correct subtitles before they are embedded/burned
-python video_audio_downloader.py "https://www.youtube.com/watch?v=YOUR_URL" --edit-subs --burn-subs
+### 7. AI Whisper Transcription & Translation
+If a video doesn't have subtitles, or if it has hardcoded foreign subtitles you want to translate, you can use local AI!
+- `--whisper-subs`: Uses the local `whisper` model to transcribe the audio instead of downloading `yt-dlp` subtitles.
+- `--whisper-model`: Choose the model size (e.g., `base`, `small`, `medium`). Default is `base`.
+- `--translate-to`: The target language. Defaults to `English` (which uses Whisper natively). If set to another language (e.g., `Chinese`), it will automatically query your local Ollama instance to translate the text!
+- `--translation-model`: The Ollama model to use if translating to a non-English language (default: `minimax-m2.7:cloud`).
+
+```powershell
+# Transcribe Korean audio, translate to English, and hard-burn it over the old subtitles!
+python video_audio_downloader.py "https://www.youtube.com/watch?v=URL" --whisper-subs --translate-to English --burn-subs --burn-bg
+
+# Transcribe audio, translate to Chinese via Ollama, let me edit it manually, then embed it!
+python video_audio_downloader.py "https://www.youtube.com/watch?v=URL" --whisper-subs --translate-to Chinese --edit-subs --embed-subs
 ```
 
 ### Putting It All Together

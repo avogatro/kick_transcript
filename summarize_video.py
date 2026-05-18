@@ -112,7 +112,7 @@ def main():
     parser.add_argument("--output", help="Output filename for the audio (default: audio.mp3)", default="audio.mp3")
     parser.add_argument("--no-transcript", help="Skip the Whisper transcription.", action="store_true")
     parser.add_argument("--vocabulary", help="Names of guests, hosts, or context to help Whisper spell them correctly (e.g., 'Destiny, Sneako').", default="")
-    parser.add_argument("--model", help="Ollama model to use for summarization. If provided, the script will automatically query local Ollama.", default="minimax-m2.7:cloud")
+    parser.add_argument("--model", help="Ollama model to use for summarization. If provided, the script will automatically query local Ollama.", default="gemma4")
     parser.add_argument("--skip-step-to", choices=["step-transcription", "step-summary"], help="Skip directly to transcription or summarization step.", default=None)
     
     # Customize the GEM / Skill prompt here
@@ -121,16 +121,16 @@ def main():
         help="Custom instruction for Gemini to summarize the transcript.", 
         default="""
 You help me summarize video transcripts for learning purposes. 
-Videos can be 2 to 3 hours long. I want no skipping, especially in the middle of a long video. 
-Questions and discussions about AI cannot be skipped.
-I would like the summary to be detailed and precise. 
+Timestamps in transcript is represented as [hh:mm:ss] at the beginning of each line.
+Videos can be very long. I want no skipping, especially in the middle of a long video. 
+Questions and discussions about AI should not be skipped.
+The summary needs to be detailed and precise. 
 The language should be clear, logical, and easy to read.
-Add timestamps for me to navigate and rewatch interesting parts of the video.
+Add timestamps for me to navigate and rewatch interesting sections of the video.
 Add titles for sections or chapters if it makes sense.
 The output should be in Markdown format so that I can easily copy and paste it into Discord.
-At the end of each summary, write a short introduction and list some highlights. 
+At the end of each summary, write a short introduction and list highlights.
 Do not use markdown table format.
-Time is represented as [hh:mm:ss] at the beginning of each line.
 """
     )
     
