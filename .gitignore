@@ -6,3 +6,4 @@ transcript.txt
 *.mp4
 *.png
 *.srt
+*.pyc

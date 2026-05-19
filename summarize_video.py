@@ -62,28 +62,31 @@ def download_video(url, start_time, end_time, output_filename="audio.mp3"):
         print("Error: 'yt-dlp' is not installed or not in PATH.", file=sys.stderr)
         sys.exit(1)
 
-def transcribe_and_prepare_prompt(video_path, prompt_text, whisper_model_size="base", offset_seconds=0, vocabulary=""):
+def transcribe_and_prepare_prompt(video_path, prompt_text, whisper_model_size="large", offset_seconds=0, vocabulary=""):
     """
     Uses OpenAI's Whisper locally to transcribe the video.
     Once done, formats a prompt and transcript for Gemini.
     """
     try:
         import whisper
+        import torch
     except ImportError:
         print("Error: 'openai-whisper' is not installed. Run 'pip install openai-whisper'.", file=sys.stderr)
         sys.exit(1)
-        
+    
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    fp16_val = True if device == "cuda" else False
+    
     print(f"\nLoading Whisper model '{whisper_model_size}' (this may take a moment or download weights the first time)...")
-    model = whisper.load_model(whisper_model_size)
+    model = whisper.load_model(whisper_model_size,device=device)
     
     print("Transcribing video (this will take some time depending on your CPU/GPU)...")
     
-    transcribe_kwargs = {"fp16": False}
+    transcribe_kwargs = {"fp16": fp16_val}
     if vocabulary:
         transcribe_kwargs["initial_prompt"] = vocabulary
         transcribe_kwargs["carry_initial_prompt"] = True
-        
-        
+          
     result = model.transcribe(video_path, **transcribe_kwargs)
     
     transcript_lines = []
@@ -113,6 +116,7 @@ def main():
     parser.add_argument("--no-transcript", help="Skip the Whisper transcription.", action="store_true")
     parser.add_argument("--vocabulary", help="Names of guests, hosts, or context to help Whisper spell them correctly (e.g., 'Destiny, Sneako').", default="")
     parser.add_argument("--model", help="Ollama model to use for summarization. If provided, the script will automatically query local Ollama.", default="gemma4")
+    parser.add_argument("--whisper-model-size", help="Size of the Whisper model to use (e.g., base, small, medium, large).", default="large")
     parser.add_argument("--skip-step-to", choices=["step-transcription", "step-summary"], help="Skip directly to transcription or summarization step.", default=None)
     
     # Customize the GEM / Skill prompt here
@@ -151,7 +155,7 @@ Do not use markdown table format.
         if not args.no_transcript:
             offset = 0
             # offset = parse_time_to_seconds(args.start)
-            transcript = transcribe_and_prepare_prompt(video_path, args.prompt, offset_seconds=offset, vocabulary=args.vocabulary)
+            transcript = transcribe_and_prepare_prompt(video_path, args.prompt, whisper_model_size=args.whisper_model_size, offset_seconds=offset, vocabulary=args.vocabulary)
         else:
             print("\nSkipping transcription as --no-transcript was provided.")
     else:
