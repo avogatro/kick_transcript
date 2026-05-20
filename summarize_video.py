@@ -1,111 +1,10 @@
 import argparse
-import subprocess
 import sys
 import os
-
-def parse_time_to_seconds(time_str):
-    if not time_str:
-        return 0
-    if time_str.isdigit():
-        return int(time_str)
-    parts = time_str.split(':')
-    if len(parts) == 3: # hh:mm:ss
-        return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
-    elif len(parts) == 2: # mm:ss
-        return int(parts[0]) * 60 + int(parts[1])
-    return 0
-
-def format_timestamp(seconds):
-    h = int(seconds // 3600)
-    m = int((seconds % 3600) // 60)
-    s = int(seconds % 60)
-    return f"{h:02d}:{m:02d}:{s:02d}"
-
-def download_video(url, start_time, end_time, output_filename="audio.mp3"):
-    """
-    Downloads a video from Kick using yt-dlp.
-    Optionally clips the video given start and end times.
-    """
-    print(f"Downloading video from {url}...")
-    
-    # Build the yt-dlp command
-    # extract audio as mp3 and use impersonation for Cloudflare bypass
-    command = [
-        "yt-dlp",
-        "-S","height:360",
-        "-f", "bestaudio/best",
-        "--extract-audio",
-        "--audio-format", "mp3",
-        "-o", output_filename,
-        "--force-overwrite",
-        "--impersonate", "chrome",
-    ]
-    
-    # Add section download arguments if both start and end times are provided
-    if start_time and end_time:
-        print(f"Clipping section from {start_time} to {end_time}...")
-        # The syntax for passing start and end into yt-dlp via ffmpeg
-        command.extend(["--download-sections", f"*{start_time}-{end_time}"])
-    elif start_time or end_time:
-        print("Warning: Both --start and --end must be provided to clip the video. Downloading the full video instead.")
-
-    command.append(url)
-    
-    try:
-        subprocess.run(command, check=True)
-        print(f"Video downloaded successfully as '{output_filename}'.")
-        return output_filename
-    except subprocess.CalledProcessError as e:
-        print(f"Error downloading video: {e}", file=sys.stderr)
-        sys.exit(1)
-    except FileNotFoundError:
-        print("Error: 'yt-dlp' is not installed or not in PATH.", file=sys.stderr)
-        sys.exit(1)
-
-def transcribe_and_prepare_prompt(video_path, prompt_text, whisper_model_size="large", offset_seconds=0, vocabulary=""):
-    """
-    Uses OpenAI's Whisper locally to transcribe the video.
-    Once done, formats a prompt and transcript for Gemini.
-    """
-    try:
-        import whisper
-        import torch
-    except ImportError:
-        print("Error: 'openai-whisper' is not installed. Run 'pip install openai-whisper'.", file=sys.stderr)
-        sys.exit(1)
-    
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    fp16_val = True if device == "cuda" else False
-    
-    print(f"\nLoading Whisper model '{whisper_model_size}' (this may take a moment or download weights the first time)...")
-    model = whisper.load_model(whisper_model_size,device=device)
-    
-    print("Transcribing video (this will take some time depending on your CPU/GPU)...")
-    
-    transcribe_kwargs = {"fp16": fp16_val}
-    if vocabulary:
-        transcribe_kwargs["initial_prompt"] = vocabulary
-        transcribe_kwargs["carry_initial_prompt"] = True
-          
-    result = model.transcribe(video_path, **transcribe_kwargs)
-    
-    transcript_lines = []
-    for segment in result.get("segments", []):
-        seg_start = segment["start"] + offset_seconds
-        timestamp = format_timestamp(seg_start)
-        text = segment["text"].strip()
-        transcript_lines.append(f"[{timestamp}] {text}")
-        
-    transcript = "\n".join(transcript_lines)
-    
-    transcript_filename = "transcript.txt"
-    with open(transcript_filename, "w", encoding="utf-8") as f:
-        f.write(transcript)
-    
-    abs_path = os.path.abspath(transcript_filename)
-    print(f"Transcript saved locally to '{abs_path}'.\n")
-    print("=" * 60)
-    return transcript
+from kick_tools.utils import parse_time_to_seconds
+from kick_tools.downloader import MediaDownloader
+from kick_tools.transcriber import WhisperTranscriber
+from kick_tools.llm import OllamaClient
 
 def main():
     parser = argparse.ArgumentParser(description="Download a Kick video, optionally cut it, and generate a transcript summary prompt for Gemini.")
@@ -141,11 +40,15 @@ Do not use markdown table format.
     args = parser.parse_args()
     
     video_path = args.output
+    downloader = MediaDownloader()
+    
     # 1. Download / Clip Video
     if args.skip_step_to not in ["step-transcription", "step-summary"]:
         if not args.url:
             parser.error("url argument is required unless --skip-step-to is provided.")
-        video_path = download_video(args.url, args.start, args.end, args.output)
+        video_path = downloader.download(args.url, start=args.start, end=args.end, output=args.output, audio_only=True)
+        if not video_path:
+            sys.exit(1)
     else:
         print(f"Skipping video download based on --skip-step-to. Assuming video exists at '{video_path}' if needed.")
     
@@ -153,9 +56,14 @@ Do not use markdown table format.
     transcript = ""
     if args.skip_step_to != "step-summary":
         if not args.no_transcript:
-            offset = 0
-            # offset = parse_time_to_seconds(args.start)
-            transcript = transcribe_and_prepare_prompt(video_path, args.prompt, whisper_model_size=args.whisper_model_size, offset_seconds=offset, vocabulary=args.vocabulary)
+            transcriber = WhisperTranscriber(model_size=args.whisper_model_size)
+            transcript, _ = transcriber.transcribe(video_path, vocabulary=args.vocabulary)
+            
+            transcript_filename = "transcript.txt"
+            with open(transcript_filename, "w", encoding="utf-8") as f:
+                f.write(transcript)
+            
+            print(f"Transcript saved locally to '{os.path.abspath(transcript_filename)}'.\n")
         else:
             print("\nSkipping transcription as --no-transcript was provided.")
     else:
@@ -173,31 +81,22 @@ Do not use markdown table format.
         if model_name:
             print("\n" + "=" * 60)
             print(f"CALLING OLLAMA ({model_name})...")
-            try:
-                import requests
-                url = "http://localhost:11434/api/generate"
-                payload = {
-                    "model": model_name,
-                    "prompt": f"{args.prompt}\n\nf{args.vocabulary}\n\n[Transcript]:\n{transcript}",
-                    "stream": False
-                }
-                response = requests.post(url, json=payload)
-                response.raise_for_status()
-                result = response.json()
+            client = OllamaClient()
+            summary = client.summarize(model_name, transcript, args.prompt, args.vocabulary)
+            
+            if summary:
                 print("\n=== OLLAMA SUMMARY ===")
-                print(result.get("response", ""))
+                print(summary)
                 print("======================\n")
 
                 with open("summary.md", "w", encoding="utf-8") as f:
-                    f.write(result.get("response"))
-            except ImportError:
-                print("Error: 'requests' is not installed. Run 'pip install requests'.", file=sys.stderr)
-            except Exception as e:
-                print(f"Failed to query Ollama API: {e}", file=sys.stderr)
+                    f.write(summary)
+            else:
+                print("Failed to get summary from Ollama.", file=sys.stderr)
         else:
             print("=" * 60)
             print("READY FOR OLLAMA:")
-            full_text = f"{args.prompt}\n\nf{args.vocabulary}\n\n[Transcript from Video]:\n{transcript}"
+            full_text = f"{args.prompt}\n\n{args.vocabulary}\n\n[Transcript from Video]:\n{transcript}"
             print(full_text)
             print("=" * 60)
 

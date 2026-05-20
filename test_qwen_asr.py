@@ -2,6 +2,7 @@ import argparse
 import os
 import torch
 from qwen_asr import Qwen3ASRModel
+from kick_tools.utils import format_timestamp
 
 def test_transcription(file_path):
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -29,24 +30,6 @@ def test_transcription(file_path):
 
     print(f"Transcribing '{file_path}'... This may take a while to download weights on the first run.")
     
-    def format_seconds_to_srt_time(seconds):
-        if seconds is None:
-            return "00:00:00,000"
-        hours = int(seconds // 3600)
-        minutes = int((seconds % 3600) // 60)
-        secs = int(seconds % 60)
-        millis = int(round((seconds - int(seconds)) * 1000))
-        if millis >= 1000:
-            millis -= 1000
-            secs += 1
-            if secs >= 60:
-                secs -= 60
-                minutes += 1
-                if minutes >= 60:
-                    minutes -= 60
-                    hours += 1
-        return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
-
     try:
         results = model.transcribe(
             audio=[file_path],
@@ -58,17 +41,13 @@ def test_transcription(file_path):
         
         with open(out_file, "w", encoding="utf-8") as f:
             for r in results:
-                # r.time_stamps is typically a list of tokens/words
-                # We'll group them into segments of up to 10 words or until a punctuation mark
                 segment_index = 1
                 current_words = []
                 current_start = None
                 current_end = None
                 
-                # Depending on the exact structure returned by Qwen3ASR, time_stamps could be a nested list
                 flat_timestamps = []
                 if hasattr(r, 'time_stamps') and r.time_stamps:
-                    # Flatten if it's a list of lists
                     for item in r.time_stamps:
                         if isinstance(item, list):
                             flat_timestamps.extend(item)
@@ -88,10 +67,9 @@ def test_transcription(file_path):
                     current_end = end
                     current_words.append(text)
                     
-                    # Break segment if it reaches 10 words or ends with sentence punctuation
                     if len(current_words) >= 10 or text.strip()[-1:] in ['.', '!', '?', '。', '！', '？']:
-                        start_str = format_seconds_to_srt_time(current_start)
-                        end_str = format_seconds_to_srt_time(current_end)
+                        start_str = format_timestamp(current_start, include_ms=True)
+                        end_str = format_timestamp(current_end, include_ms=True)
                         segment_text = "".join(current_words) if r.language in ["Chinese", "Japanese"] else " ".join(current_words)
                         f.write(f"{segment_index}\n{start_str} --> {end_str}\n{segment_text.strip()}\n\n")
                         
@@ -100,10 +78,9 @@ def test_transcription(file_path):
                         current_start = None
                         current_end = None
                 
-                # Write any remaining words
                 if current_words:
-                    start_str = format_seconds_to_srt_time(current_start)
-                    end_str = format_seconds_to_srt_time(current_end)
+                    start_str = format_timestamp(current_start, include_ms=True)
+                    end_str = format_timestamp(current_end, include_ms=True)
                     segment_text = "".join(current_words) if r.language in ["Chinese", "Japanese"] else " ".join(current_words)
                     f.write(f"{segment_index}\n{start_str} --> {end_str}\n{segment_text.strip()}\n\n")
 

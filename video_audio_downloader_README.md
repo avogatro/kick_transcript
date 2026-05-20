@@ -86,7 +86,7 @@ If a video doesn't have subtitles, or if it has hardcoded foreign subtitles you 
 - `--whisper-subs`: Uses the local `whisper` model to transcribe the audio instead of downloading `yt-dlp` subtitles.
 - `--whisper-model`: Choose the model size (e.g., `base`, `small`, `medium`). Default is `base`.
 - `--translate-to`: The target language. Defaults to `English` (which uses Whisper natively). If set to another language (e.g., `Chinese`), it will automatically query your local Ollama instance to translate the text!
-- `--translation-model`: The Ollama model to use if translating to a non-English language (default: `minimax-m2.7:cloud`).
+- `--translation-model`: The Ollama model to use if translating to a non-English language (default: `gemma4`).
 
 ```powershell
 # Transcribe Korean audio, translate to English, and hard-burn it over the old subtitles!

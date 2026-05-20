@@ -91,7 +91,7 @@ python summarize_video.py --skip-step-to step-summary -vocabulary "Spell Name Ji
 - `--end`: End time for trimming (e.g., `00:02:45`). **Note:** Both `--start` and `--end` must be provided to clip the video correctly.
 - `--output`: Name of the temporary audio file (default: `audio.mp3`).
 - `--vocabulary`: Specific names or context to help Whisper transcribe better (This is also fed to Ollama to establish prompt context).
-- `--model`: The local Ollama model to use for the API call (default: `minimax-m2.7:cloud`).
+- `--model`: The local Ollama model to use for the API call (default: `gemma4`).
 - `--whisper-model-size`: Size of the Whisper model to use (e.g., `tiny`, `base`, `small`, `medium`, `large`). Default is `large`.
 - `--no-transcript`: Skip the Whisper transcription phase completely.
 - `--skip-step-to`: Skip directly into a specific stage (`step-transcription` or `step-summary`), bypassing the video download or transcription process respectively.
