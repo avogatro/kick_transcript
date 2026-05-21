@@ -14,8 +14,8 @@ def main():
     parser.add_argument("--output", help="Output filename for the audio (default: audio.mp3)", default="audio.mp3")
     parser.add_argument("--no-transcript", help="Skip the Whisper transcription.", action="store_true")
     parser.add_argument("--vocabulary", help="Names of guests, hosts, or context to help Whisper spell them correctly (e.g., 'Destiny, Sneako').", default="")
-    parser.add_argument("--model", help="Ollama model to use for summarization. If provided, the script will automatically query local Ollama.", default="gemma4")
-    parser.add_argument("--whisper-model-size", help="Size of the Whisper model to use (e.g., base, small, medium, large).", default="large")
+    parser.add_argument("--model", help="LLM model to use for summarization. Use 'gemma4' or another model name for Ollama, or 'gemini-3.5-flash' / 'gemini-1.5-flash' for Gemini (requires GEMINI_API_KEY environment variable).", default="gemma4")
+    parser.add_argument("--whisper-model-size", help="Size of the Whisper model to use (e.g., base, small, medium, large, turbo).", default="turbo")
     parser.add_argument("--skip-step-to", choices=["step-transcription", "step-summary"], help="Skip directly to transcription or summarization step.", default=None)
     
     # Customize the GEM / Skill prompt here
@@ -23,17 +23,29 @@ def main():
         "--prompt", 
         help="Custom instruction for Gemini to summarize the transcript.", 
         default="""
-You help me summarize video transcripts for learning purposes. 
-Timestamps in transcript is represented as [hh:mm:ss] at the beginning of each line.
-Videos can be very long. I want no skipping, especially in the middle of a long video. 
-Questions and discussions about AI should not be skipped.
-The summary needs to be detailed and precise. 
-The language should be clear, logical, and easy to read.
-Add timestamps for me to navigate and rewatch interesting sections of the video.
-Add titles for sections or chapters if it makes sense.
-The output should be in Markdown format so that I can easily copy and paste it into Discord.
-At the end of each summary, write a short introduction and list highlights.
-Do not use markdown table format.
+You are an expert AI learning assistant and technical scribe. Your goal is to transform the provided video transcript into comprehensive, highly structured, and educational study notes.
+
+Follow these strict rules when generating your response:
+1. **No Skipping/Loss of Detail**: Summarize the ENTIRE transcript comprehensively. Do not gloss over or skip sections, especially in the middle of long videos. 
+    Ensure all technical explanations, deep dives, questions, and discussions—particularly those regarding AI and technology—are captured with detailed precision.
+2. **Chronological Chapters**: Break the video down into logical, chronological chapters or themed sections that make sense.
+3. **Format & Navigation**:
+   - For every chapter or section, create a clear Markdown heading in this exact format: `## [HH:MM:SS] - Chapter Title` using the precise timestamp from the transcript.
+   - Use standard Markdown (`##`, `###`, bolding, list bullets) optimized for copy-pasting into Discord.
+   - **NEVER use Markdown tables** (they do not render correctly in Discord).
+4. **Style & Tone**: Ensure the language is exceptionally clear, logical, educational, professional, and easy to read.
+
+### Required Output Structure:
+First, provide the chronological chapter-by-chapter detailed summary:
+- **`## [HH:MM:SS] - Section/Chapter Title`**
+  - **Summary**: A detailed, logical explanation of the concepts, arguments, and discussions.
+  - **Key Notes**: Bulleted details capturing specific definitions, names, and tech/AI insights.
+
+At the very end of your response, output a horizontal separator `---` followed by this final section:
+---
+### 📌 Video Overview & Key Highlights
+- **Introduction**: A short, high-level overview (2-3 sentences) introducing the main topic, context, and core thesis of the entire video.
+- **Highlights**: A bulleted list of 3-5 of the most valuable, high-impact takeaways or key moments.
 """
     )
     
@@ -75,24 +87,38 @@ Do not use markdown table format.
             print("Error: 'transcript.txt' not found. Cannot skip to summary.", file=sys.stderr)
             sys.exit(1)
 
-    # 3. Automatic Ollama API Call
+    # 3. Automatic LLM API Call
     if transcript:
         model_name = args.model
         if model_name:
             print("\n" + "=" * 60)
-            print(f"CALLING OLLAMA ({model_name})...")
-            client = OllamaClient()
-            summary = client.summarize(model_name, transcript, args.prompt, args.vocabulary)
+            if model_name.startswith("gemini"):
+                print(f"CALLING GEMINI ({model_name})...")
+                api_key = os.environ.get("GEMINI_API_KEY")
+                if not api_key:
+                    print("Error: GEMINI_API_KEY environment variable is not set.", file=sys.stderr)
+                    print("To run with Gemini, please set the GEMINI_API_KEY environment variable.", file=sys.stderr)
+                    print("You can get a FREE key from: https://aistudio.google.com/", file=sys.stderr)
+                    sys.exit(1)
+                from kick_tools.llm import GeminiClient
+                client = GeminiClient(api_key=api_key)
+                summary = client.summarize(model_name, transcript, args.prompt, args.vocabulary)
+                provider = "GEMINI"
+            else:
+                print(f"CALLING OLLAMA ({model_name})...")
+                client = OllamaClient()
+                summary = client.summarize(model_name, transcript, args.prompt, args.vocabulary)
+                provider = "OLLAMA"
             
             if summary:
-                print("\n=== OLLAMA SUMMARY ===")
+                print(f"\n=== {provider} SUMMARY ===")
                 print(summary)
                 print("======================\n")
 
                 with open("summary.md", "w", encoding="utf-8") as f:
                     f.write(summary)
             else:
-                print("Failed to get summary from Ollama.", file=sys.stderr)
+                print(f"Failed to get summary from {provider}.", file=sys.stderr)
         else:
             print("=" * 60)
             print("READY FOR OLLAMA:")

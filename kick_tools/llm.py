@@ -42,3 +42,45 @@ class OllamaClient:
         if result:
             return result.get("response", "").strip()
         return text
+
+class GeminiClient:
+    def __init__(self, api_key):
+        self.api_key = api_key
+
+    def summarize(self, model, transcript, system_prompt, vocabulary=""):
+        """
+        Specific method for summarizing transcripts via the free Google AI Studio Gemini API.
+        """
+        # Default to gemini-3.5-flash if none specified or if model is just 'gemini'
+        actual_model = model if model != "gemini" else "gemini-3.5-flash"
+        url = f"https://generativelanguage.googleapis.com/v1/models/{actual_model}:generateContent?key={self.api_key}"
+        
+        full_prompt = f"{system_prompt}\n\nContext/Vocabulary: {vocabulary}\n\n[Transcript]:\n{transcript}"
+        
+        payload = {
+            "contents": [{
+                "parts": [{
+                    "text": full_prompt
+                }]
+            }]
+        }
+        
+        try:
+            response = requests.post(url, json=payload)
+            response.raise_for_status()
+            res_json = response.json()
+            candidates = res_json.get("candidates", [])
+            if candidates:
+                parts = candidates[0].get("content", {}).get("parts", [])
+                if parts:
+                    return parts[0].get("text", "")
+            return None
+        except requests.exceptions.RequestException as e:
+            print(f"Error querying Gemini API: {e}", file=sys.stderr)
+            if 'response' in locals() and response is not None:
+                try:
+                    print(f"API Error Response: {response.text}", file=sys.stderr)
+                except Exception:
+                    pass
+            return None
+

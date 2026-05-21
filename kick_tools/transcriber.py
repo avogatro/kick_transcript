@@ -4,7 +4,7 @@ import sys
 from .utils import format_timestamp, ensure_package_installed
 
 class WhisperTranscriber:
-    def __init__(self, model_size="large"):
+    def __init__(self, model_size="turbo"):
         self.model_size = model_size
         self.model = None
 

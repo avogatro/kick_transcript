@@ -165,7 +165,7 @@ def main():
     parser.add_argument("--sub-lang", help="Subtitle language to download. Default: en", default="en")
     parser.add_argument("--burn-color", help="Color of the text when using --burn-subs (e.g. 'yellow', 'white', 'green', 'red'). Default: white", default="yellow")
     parser.add_argument("--whisper-subs", help="Use local Whisper AI to transcribe audio instead of downloading yt-dlp subtitles.", action="store_true")
-    parser.add_argument("--whisper-model", help="Whisper model to use (default: large).", default="large")
+    parser.add_argument("--whisper-model", help="Whisper model to use (default: turbo).", default="turbo")
     parser.add_argument("--translate-to", help="Target language to translate subtitles to via Whisper/Ollama (default: English).", default="English")
     parser.add_argument("--translation-model", help="Ollama model for translation if not English.", default="gemma4")
     parser.add_argument("--burn-bg", help="Draw a solid black background behind burned subtitles (useful for hiding hardcoded text).", action="store_true")

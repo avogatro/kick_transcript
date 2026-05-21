@@ -32,16 +32,42 @@ brew install ffmpeg
 sudo apt update && sudo apt install ffmpeg
 ```
 
-### 3. Ollama (Local AI Summarizer)
-This script uses a local Large Language Model via Ollama to crunch the transcript into a detailed summary. Based on the script's default, it looks for the `minimax-m2.7:cloud` model.
+### 3. LLM Summarizer Options (Ollama or Gemini)
+
+This script can utilize either a local LLM running on **Ollama**, or Google's high-speed cloud **Gemini API** to summarize the transcripts.
+
+#### Option A: Local LLM via Ollama (Default)
+By default, the script looks for local models via Ollama. It defaults to using `gemma4`.
 
 1. Download and install [Ollama](https://ollama.com/download) for your operating system.
 2. Ensure the Ollama app is running in the background.
-3. Open a terminal and test the required model before running the script:
+3. Pull the required model before running the script:
    ```bash
-   ollama run minimax-m2.7:cloud
+   ollama pull gemma4
    ```
-   *(If you want to use local model, such as `llama3`, run `ollama pull llama3` instead and specify it via the script arguments).*
+   *(If you want to use another model like `llama3`, simply run `ollama pull llama3` and pass `--model llama3` to the script).*
+
+#### Option B: Google Gemini API (Cloud)
+To use Google Gemini (e.g., `gemini-3.5-flash` or `gemini-1.5-flash`), which is incredibly fast and produces high-quality structured notes:
+
+1. Obtain a **free** Gemini API key from [Google AI Studio](https://aistudio.google.com/).
+2. Set the `GEMINI_API_KEY` environment variable:
+   - **On Windows (PowerShell):**
+     ```powershell
+     $env:GEMINI_API_KEY="your_api_key_here"
+     ```
+   - **On Windows (CMD):**
+     ```cmd
+     set GEMINI_API_KEY=your_api_key_here
+     ```
+   - **On macOS / Linux (Terminal):**
+     ```bash
+     export GEMINI_API_KEY="your_api_key_here"
+     ```
+3. Run the script with `--model gemini` or a specific model name:
+   ```bash
+   python summarize_video.py "KICK_URL" --model gemini
+   ```
 
 ---
 
@@ -90,9 +116,11 @@ python summarize_video.py --skip-step-to step-summary -vocabulary "Spell Name Ji
 - `--start`: Start time for trimming (e.g., `00:01:30`).
 - `--end`: End time for trimming (e.g., `00:02:45`). **Note:** Both `--start` and `--end` must be provided to clip the video correctly.
 - `--output`: Name of the temporary audio file (default: `audio.mp3`).
-- `--vocabulary`: Specific names or context to help Whisper transcribe better (This is also fed to Ollama to establish prompt context).
-- `--model`: The local Ollama model to use for the API call (default: `gemma4`).
-- `--whisper-model-size`: Size of the Whisper model to use (e.g., `tiny`, `base`, `small`, `medium`, `large`). Default is `large`.
+- `--vocabulary`: Specific names or context to help Whisper transcribe better (This is also fed to the LLM to establish prompt context).
+- `--model`: The LLM model to use for summarization (default: `gemma4`).
+  - To use **Ollama**, pass any local model name (e.g., `gemma4`, `llama3`).
+  - To use **Gemini**, pass any model name starting with `gemini` (e.g., `gemini`, `gemini-3.5-flash`, `gemini-1.5-flash`). This requires setting the `GEMINI_API_KEY` environment variable.
+- `--whisper-model-size`: Size of the Whisper model to use (e.g., `tiny`, `base`, `small`, `medium`, `large`, `turbo`). Default is `turbo`.
 - `--no-transcript`: Skip the Whisper transcription phase completely.
 - `--skip-step-to`: Skip directly into a specific stage (`step-transcription` or `step-summary`), bypassing the video download or transcription process respectively.
 
