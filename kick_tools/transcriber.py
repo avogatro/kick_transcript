@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+from typing import Any, Dict
 from .utils import format_timestamp, ensure_package_installed
 
 class WhisperTranscriber:
@@ -25,11 +26,12 @@ class WhisperTranscriber:
         fp16_val = True if device == "cuda" else False
 
         print(f"Transcribing '{file_path}'...")
-        transcribe_kwargs = {"fp16": fp16_val}
+        transcribe_kwargs: Dict[str, Any] = {"fp16": fp16_val}
         if vocabulary:
             transcribe_kwargs["initial_prompt"] = vocabulary
             transcribe_kwargs["carry_initial_prompt"] = True
 
+        assert self.model is not None
         result = self.model.transcribe(file_path, **transcribe_kwargs)
         
         transcript_lines = []
