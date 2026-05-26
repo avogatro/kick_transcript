@@ -6,6 +6,83 @@ from kick_tools.downloader import MediaDownloader
 from kick_tools.transcriber import WhisperTranscriber
 from kick_tools.llm import OllamaClient
 
+def get_or_prompt_gemini_api_key():
+    # 1. Check environment variable
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if api_key:
+        return api_key
+
+    # 2. Check .env file
+    env_path = ".env"
+    if os.path.exists(env_path):
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                if "=" in line:
+                    key, val = line.strip().split("=", 1)
+                    if key.strip() == "GEMINI_API_KEY":
+                        val_cleaned = val.strip().strip('"').strip("'")
+                        if val_cleaned:
+                            return val_cleaned
+
+    # 3. Prompt user for key
+    print("Gemini API key not found in GEMINI_API_KEY environment variable or .env file.")
+    print("You can get a FREE key from: https://aistudio.google.com/")
+    try:
+        user_key = input("Please enter your Gemini API Key: ").strip()
+    except EOFError:
+        print("Error: Standard input is not available to prompt for API key.", file=sys.stderr)
+        return None
+        
+    if not user_key:
+        print("Error: No API key provided.", file=sys.stderr)
+        return None
+
+    # 4. Save to .env
+    lines = []
+    key_written = False
+    if os.path.exists(env_path):
+        with open(env_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        
+        for i, line in enumerate(lines):
+            if line.strip().startswith("GEMINI_API_KEY="):
+                lines[i] = f"GEMINI_API_KEY={user_key}\n"
+                key_written = True
+                break
+    
+    if not key_written:
+        if lines and not lines[-1].endswith("\n"):
+            lines.append("\n")
+        lines.append(f"GEMINI_API_KEY={user_key}\n")
+        
+    with open(env_path, "w", encoding="utf-8") as f:
+        f.writelines(lines)
+    print(f"API key successfully saved to '{env_path}'.")
+
+    # 5. Add to .gitignore if not already there
+    gitignore_path = ".gitignore"
+    has_env = False
+    if os.path.exists(gitignore_path):
+        with open(gitignore_path, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.strip() == ".env":
+                    has_env = True
+                    break
+        if not has_env:
+            with open(gitignore_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            with open(gitignore_path, "a", encoding="utf-8") as f:
+                if content and not content.endswith("\n"):
+                    f.write("\n")
+                f.write(".env\n")
+            print("Added '.env' to .gitignore.")
+    else:
+        with open(gitignore_path, "w", encoding="utf-8") as f:
+            f.write(".env\n")
+        print("Created .gitignore and added '.env'.")
+
+    return user_key
+
 def main():
     parser = argparse.ArgumentParser(description="Download a Kick video, optionally cut it, and generate a transcript summary prompt for Gemini.")
     parser.add_argument("url", nargs="?", help="The URL of the Kick video or clip. Optional if skipping steps.", default="")
@@ -84,6 +161,7 @@ At the very end of your response, output a horizontal separator `---` followed b
         try:
             with open("transcript.txt", "r", encoding="utf-8") as f:
                 transcript = f.read()
+                print(transcript)
         except FileNotFoundError:
             print("Error: 'transcript.txt' not found. Cannot skip to summary.", file=sys.stderr)
             sys.exit(1)
@@ -95,11 +173,8 @@ At the very end of your response, output a horizontal separator `---` followed b
             print("\n" + "=" * 60)
             if model_name.startswith("gemini"):
                 print(f"CALLING GEMINI ({model_name})...")
-                api_key = os.environ.get("GEMINI_API_KEY")
+                api_key = get_or_prompt_gemini_api_key()
                 if not api_key:
-                    print("Error: GEMINI_API_KEY environment variable is not set.", file=sys.stderr)
-                    print("To run with Gemini, please set the GEMINI_API_KEY environment variable.", file=sys.stderr)
-                    print("You can get a FREE key from: https://aistudio.google.com/", file=sys.stderr)
                     sys.exit(1)
                 from kick_tools.llm import GeminiClient
                 client = GeminiClient(api_key=api_key)
