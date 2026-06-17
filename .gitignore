@@ -8,3 +8,5 @@ transcript.txt
 *.srt
 *.pyc
 .env
+cookies-youtube-com.txt
+*.mp3

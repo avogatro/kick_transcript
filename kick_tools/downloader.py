@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 import sys
 from .utils import parse_time_to_seconds
@@ -6,12 +7,48 @@ from .utils import parse_time_to_seconds
 class MediaDownloader:
     def __init__(self, output_dir="."):
         self.output_dir = output_dir
+        
+        custom_ffmpeg = None
+        env_path = ".env"
+        if os.path.exists(env_path):
+            with open(env_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    if "=" in line:
+                        key, val = line.strip().split("=", 1)
+                        if key.strip() == "CUSTOM_FFMPEG":
+                            custom_ffmpeg = val.strip().strip('"').strip("'")
+                            break
+                            
+        if not custom_ffmpeg:
+            custom_ffmpeg = os.environ.get("CUSTOM_FFMPEG")
+
+        if custom_ffmpeg and os.path.exists(custom_ffmpeg):
+            self.ffmpeg_dir = custom_ffmpeg
+            self.ffmpeg_exe = os.path.join(custom_ffmpeg, "ffmpeg.exe")
+        else:
+            self.ffmpeg_dir = None
+            self.ffmpeg_exe = "ffmpeg"
+
 
     def download(self, url, quality="480p", start=None, end=None, output=None, audio_only=False, impersonate="chrome", download_subs=False, sub_lang="en"):
         """
         Downloads media using yt-dlp.
         """
-        command = ["yt-dlp"]
+        command = [
+            "yt-dlp",
+            "--downloader-args", "ffmpeg:-nostdin",
+            "--postprocessor-args", "ffmpeg:-nostdin",
+            "--remote-components", "ejs:github"
+        ]
+        
+        if not os.path.exists("cookies-youtube-com.txt"):
+            command.extend(["--cookies-from-browser", "firefox"])
+            command.extend(["--cookies", "cookies-youtube-com.txt"])
+        else:
+            command.extend(["--cookies", "cookies-youtube-com.txt"])
+               
+        if self.ffmpeg_dir:
+            command.extend(["--ffmpeg-location", self.ffmpeg_dir])
         
         if download_subs:
             command.extend(["--write-subs", "--write-auto-subs", "--sub-langs", sub_lang, "--convert-subs", "srt"])
@@ -28,7 +65,11 @@ class MediaDownloader:
         else:
             command.extend(["-o", "%(title).60B.%(ext)s", "--restrict-filenames"])
             # Get the actual filename that yt-dlp will use
-            sim_cmd = ["yt-dlp", "--simulate", "--print", "filename"]
+            sim_cmd = ["yt-dlp", "--simulate", "--print", "filename", "--remote-components", "ejs:github"]
+            if os.path.exists("youtube_cookies.txt"):
+                sim_cmd.extend(["--cookies", "youtube_cookies.txt"])
+            if self.ffmpeg_dir:
+                sim_cmd.extend(["--ffmpeg-location", self.ffmpeg_dir])
             if audio_only:
                 sim_cmd.extend(["-f", "bestaudio/best", "--extract-audio", "--audio-format", "mp3"])
             else:
@@ -37,7 +78,7 @@ class MediaDownloader:
             sim_cmd.extend(["-o", "%(title).60B.%(ext)s", "--restrict-filenames"])
             sim_cmd.append(url)
             try:
-                res = subprocess.run(sim_cmd, check=True, capture_output=True, text=True)
+                res = subprocess.run(sim_cmd, check=True, capture_output=True, text=True, stdin=subprocess.DEVNULL)
                 actual_filename = res.stdout.strip().split('\n')[0]
             except subprocess.CalledProcessError:
                 actual_filename = "downloaded_file"
@@ -50,7 +91,7 @@ class MediaDownloader:
 
         print(f"Running command: {' '.join(command)}")
         try:
-            subprocess.run(command, check=True)
+            subprocess.run(command, check=True, stdin=subprocess.DEVNULL)
             return actual_filename
         except subprocess.CalledProcessError as e:
             print(f"Error downloading: {e}", file=sys.stderr)
@@ -67,7 +108,7 @@ class MediaDownloader:
         name, ext = os.path.splitext(file_path)
         temp_file = f"{name}_speed{ext}"
         
-        ffmpeg_cmd = ["ffmpeg", "-y", "-i", file_path]
+        ffmpeg_cmd = [self.ffmpeg_exe, "-y", "-i", file_path]
         
         filters = []
         s = speed
@@ -87,7 +128,7 @@ class MediaDownloader:
         
         ffmpeg_cmd.append(temp_file)
         try:
-            subprocess.run(ffmpeg_cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+            subprocess.run(ffmpeg_cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
             os.replace(temp_file, file_path)
             return file_path
         except subprocess.CalledProcessError:
@@ -115,20 +156,20 @@ class MediaDownloader:
                 style = f"PrimaryColour={color_code},OutlineColour=&H0000&,BorderStyle=1,Outline=2,Shadow=0"
             
             ffmpeg_cmd = [
-                "ffmpeg", "-y", "-i", video_file,
+                self.ffmpeg_exe, "-y", "-i", video_file,
                 "-map", "0:v?", "-map", "0:a?",
                 "-vf", f"subtitles='{srt_escaped}':force_style='{style}'",
                 "-c:a", "copy", temp_vid
             ]
         else: # embed
             ffmpeg_cmd = [
-                "ffmpeg", "-y", "-i", video_file, "-i", srt_file,
+                self.ffmpeg_exe, "-y", "-i", video_file, "-i", srt_file,
                 "-map", "0:v?", "-map", "0:a?", "-map", "1:s",
                 "-c:v", "copy", "-c:a", "copy", "-c:s", "mov_text", temp_vid
             ]
 
         try:
-            subprocess.run(ffmpeg_cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+            subprocess.run(ffmpeg_cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
             os.replace(temp_vid, video_file)
             return True
         except subprocess.CalledProcessError:
