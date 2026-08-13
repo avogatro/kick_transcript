@@ -151,6 +151,7 @@ def run_downloader(args):
 def main():
     parser = argparse.ArgumentParser(description="Download strings and videos using yt-dlp with simple arguments.")
     parser.add_argument("url", nargs="?", help="The URL of the video to download. Optional if using --local-video.", default="")
+    parser.add_argument("--check", help="Run diagnostic health check to verify yt-dlp, FFmpeg, cookies, and live downloading.", action="store_true")
     parser.add_argument("--local-video", help="Bypass yt-dlp and use a local video file instead.", default=None)
     parser.add_argument("--quality", help="Video quality (e.g., '480p', '1080p'). Default: 480p", default="480p")
     parser.add_argument("--start", help="Start time in seconds or HH:MM:SS format (e.g., 00:01:30).", default=None)
@@ -163,7 +164,7 @@ def main():
     parser.add_argument("--burn-subs", help="Hard burn the subtitles directly into the video pixels (re-encodes video).", action="store_true")
     parser.add_argument("--edit-subs", help="Pause the script to let you manually edit the downloaded .srt file before embedding/burning.", action="store_true")
     parser.add_argument("--sub-lang", help="Subtitle language to download. Default: en", default="en")
-    parser.add_argument("--burn-color", help="Color of the text when using --burn-subs (e.g. 'yellow', 'white', 'green', 'red'). Default: white", default="yellow")
+    parser.add_argument("--burn-color", help="Color of the text when using --burn-subs (e.g. 'yellow', 'white', 'green', 'red'). Default: yellow", default="yellow")
     parser.add_argument("--whisper-subs", help="Use local Whisper AI to transcribe audio instead of downloading yt-dlp subtitles.", action="store_true")
     parser.add_argument("--whisper-model", help="Whisper model to use (default: turbo).", default="turbo")
     parser.add_argument("--translate-to", help="Target language to translate subtitles to via Whisper/Ollama (default: English).", default="English")
@@ -171,6 +172,12 @@ def main():
     parser.add_argument("--burn-bg", help="Draw a solid black background behind burned subtitles (useful for hiding hardcoded text).", action="store_true")
     
     args = parser.parse_args()
+
+    if args.check:
+        import check_download
+        check_download.main()
+        return
+
     run_downloader(args)
 
 if __name__ == "__main__":

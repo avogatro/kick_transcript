@@ -53,11 +53,17 @@ class MediaDownloader:
         if download_subs:
             command.extend(["--write-subs", "--write-auto-subs", "--sub-langs", sub_lang, "--convert-subs", "srt"])
         
+        height = quality.replace('p', '') if quality.endswith('p') else quality
+        
         if audio_only:
             command.extend(["-f", "bestaudio/best", "--extract-audio", "--audio-format", "mp3"])
         else:
-            height = quality.replace('p', '') if quality.endswith('p') else quality
-            command.extend(["-S", f"height:{height},vcodec:h264", "--merge-output-format", "mp4"])
+            if start or end:
+                # Prioritize m3u8 protocol for section downloads so yt-dlp fetches HLS segments instantly
+                # instead of causing FFmpeg to seek slowly over un-indexed HTTP streams.
+                command.extend(["-S", f"proto:m3u8,height:{height},vcodec:h264", "--merge-output-format", "mp4"])
+            else:
+                command.extend(["-S", f"height:{height},vcodec:h264", "--merge-output-format", "mp4"])
 
         if output:
             command.extend(["-o", output])
@@ -66,25 +72,30 @@ class MediaDownloader:
             command.extend(["-o", "%(title).60B.%(ext)s", "--restrict-filenames"])
             # Get the actual filename that yt-dlp will use
             sim_cmd = ["yt-dlp", "--simulate", "--print", "filename", "--remote-components", "ejs:github"]
-            if os.path.exists("youtube_cookies.txt"):
+            if os.path.exists("cookies-youtube-com.txt"):
+                sim_cmd.extend(["--cookies", "cookies-youtube-com.txt"])
+            elif os.path.exists("youtube_cookies.txt"):
                 sim_cmd.extend(["--cookies", "youtube_cookies.txt"])
             if self.ffmpeg_dir:
                 sim_cmd.extend(["--ffmpeg-location", self.ffmpeg_dir])
             if audio_only:
                 sim_cmd.extend(["-f", "bestaudio/best", "--extract-audio", "--audio-format", "mp3"])
             else:
-                height = quality.replace('p', '') if quality.endswith('p') else quality
-                sim_cmd.extend(["-S", f"height:{height},vcodec:h264", "--merge-output-format", "mp4"])
-            sim_cmd.extend(["-o", "%(title).60B.%(ext)s", "--restrict-filenames"])
-            sim_cmd.append(url)
+                if start or end:
+                    sim_cmd.extend(["-S", f"proto:m3u8,height:{height},vcodec:h264", "--merge-output-format", "mp4"])
+                else:
+                    sim_cmd.extend(["-S", f"height:{height},vcodec:h264", "--merge-output-format", "mp4"])
+            sim_cmd.extend(["-o", "%(title).60B.%(ext)s", "--restrict-filenames", "--impersonate", impersonate, url])
             try:
                 res = subprocess.run(sim_cmd, check=True, capture_output=True, text=True, stdin=subprocess.DEVNULL)
                 actual_filename = res.stdout.strip().split('\n')[0]
             except subprocess.CalledProcessError:
                 actual_filename = "downloaded_file"
 
-        if start and end:
-            command.extend(["--download-sections", f"*{start}-{end}", "--force-keyframes-at-cuts"])
+        if start or end:
+            s_val = start if start else "0"
+            e_val = end if end else "inf"
+            command.extend(["--download-sections", f"*{s_val}-{e_val}", "--force-keyframes-at-cuts"])
 
         command.extend(["--impersonate", impersonate, "--force-overwrite"])
         command.append(url)
