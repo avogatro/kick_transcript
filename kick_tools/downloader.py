@@ -92,9 +92,21 @@ class MediaDownloader:
             except subprocess.CalledProcessError:
                 actual_filename = "downloaded_file"
 
+        pad_offset = 0.0
         if start or end:
-            s_val = start if start else "0"
+            s_sec = parse_time_to_seconds(start) if start else 0.0
             e_val = end if end else "inf"
+            
+            # Apply a 10-second safety padding to the yt-dlp section download start time.
+            # This prevents yt-dlp's fragment selector from skipping the preceding HLS segment
+            # (which otherwise causes the first 4-5 seconds of video to be missing/undownloaded).
+            if not audio_only and start:
+                pad_s_sec = max(0.0, s_sec - 10.0)
+                pad_offset = s_sec - pad_s_sec
+                s_val = str(pad_s_sec)
+            else:
+                s_val = start if start else "0"
+
             command.extend(["--download-sections", f"*{s_val}-{e_val}", "--force-keyframes-at-cuts"])
 
         command.extend(["--impersonate", impersonate, "--force-overwrite"])
@@ -103,6 +115,49 @@ class MediaDownloader:
         print(f"Running command: {' '.join(command)}")
         try:
             subprocess.run(command, check=True, stdin=subprocess.DEVNULL)
+            
+            # Post-process video section downloads:
+            # Re-encode with ultrafast x264 starting from pad_offset (if padded), ensuring frame 0
+            # starts on a keyframe (I-frame) at exact requested timestamp with zero missing frames.
+            if not audio_only and (start or end) and os.path.exists(actual_filename):
+                print("Re-encoding video cut to ensure initial keyframe and exact stream alignment...")
+                base, ext = os.path.splitext(actual_filename)
+                temp_trimmed = f"{base}_trimtemp{ext}"
+                
+                s_sec = parse_time_to_seconds(start) if start else 0.0
+                e_sec = parse_time_to_seconds(end) if end else None
+                
+                trim_cmd = [self.ffmpeg_exe, "-y"]
+                if pad_offset > 0:
+                    trim_cmd.extend(["-ss", str(pad_offset)])
+                
+                trim_cmd.extend(["-i", actual_filename])
+                
+                if e_sec is not None:
+                    target_dur = max(0.0, e_sec - s_sec)
+                    trim_cmd.extend(["-t", str(target_dur)])
+                
+                trim_cmd.extend([
+                    "-c:v", "libx264",
+                    "-preset", "ultrafast",
+                    "-crf", "18",
+                    "-c:a", "copy",
+                    "-shortest",
+                    temp_trimmed
+                ])
+                
+                try:
+                    res = subprocess.run(trim_cmd, capture_output=True, text=True, stdin=subprocess.DEVNULL)
+                    if res.returncode == 0 and os.path.exists(temp_trimmed) and os.path.getsize(temp_trimmed) > 0:
+                        os.replace(temp_trimmed, actual_filename)
+                    else:
+                        if os.path.exists(temp_trimmed):
+                            os.remove(temp_trimmed)
+                except Exception as trim_err:
+                    print(f"Warning: Post-download stream trimming failed: {trim_err}", file=sys.stderr)
+                    if os.path.exists(temp_trimmed):
+                        os.remove(temp_trimmed)
+
             return actual_filename
         except subprocess.CalledProcessError as e:
             print(f"Error downloading: {e}", file=sys.stderr)
